@@ -1,15 +1,15 @@
-// authentication.q - Authentication Server
-// Initialize user table
+// authentication.q - authentication server
+// initialize user table
 .perm.users:([username: `$()] password:())
 
 // Add user function
-.perm.addUser:{[usr;pwd] `.perm.users upsert (usr;pwd)}
+.perm.addUser:{[usr;pwd] `.perm.users upsert (usr;md5 pwd)}
 
 // Remove user function  
 .perm.removeUser:{[usr] delete from `.perm.users where username = usr}
 
-// Set up authentication callback
-.z.pw:{[usr;pwd] pwd~.perm.users[usr][`password]}
+// Set up authentication callback with md5 for encryption
+.z.pw:{[usr;pwd] (md5 pwd)~.perm.users[usr][`password]}
 
 // Add some test users
 .perm.addUser[`mo;"salah"]

@@ -30,9 +30,9 @@
     -1"\n=== Testing Authentication ===";
     
     // Test valid credentials
-    .client.testAuth[`harry;"wizard31"];
-    .client.testAuth[`hermione;"timeturner19"];
-    .client.testAuth[`admin;"admin123"];
+    .client.testAuth[`mo;"salah"];
+    .client.testAuth[`ryan;"gravenberch"];
+    .client.testAuth[`virgil;"vandijk"];
     
     // Test invalid credentials
     -1"\n--- Testing Invalid Credentials ---";
