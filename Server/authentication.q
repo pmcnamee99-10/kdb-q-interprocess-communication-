@@ -1,17 +1,20 @@
 // authentication.q - authentication server
-// initialize user table
+// initialize user TABLE
+//usernames as symbols for more efficient lookup
+//passwords as strings to hold md5 hash text
 .perm.users:([username: `$()] password:())
 
 // Add user function
+//usr and pwd parametr names, will get mapped to table due to position
 .perm.addUser:{[usr;pwd] `.perm.users upsert (usr;md5 pwd)}
 
 // Remove user function  
 .perm.removeUser:{[usr] delete from `.perm.users where username = usr}
 
 // Set up authentication callback with md5 for encryption
-.z.pw:{[usr;pwd] (md5 pwd)~.perm.users[usr][`password]}
+.z.pw:{[usr;pwd] $[(md5 pwd)~.perm.users[usr][`password];1b;0b]}
 
-// Add some test users
+// users
 .perm.addUser[`mo;"salah"]
 .perm.addUser[`virgil;"vandijk"] 
 .perm.addUser[`alisson;"becker"]
