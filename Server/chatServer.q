@@ -1,5 +1,29 @@
+// chatServer.q - with DEBUG
 \l monitoring.q
 \p 5000
+
+// Save original .z.po from logging.q
+.orig.zpo:.z.po
+
+// override .z.po to notify all users when someone joins
+.z.po:{[hand]
+    // call original handler (logging)
+    .orig.zpo[hand];
+    
+    newUser:.z.u;
+    -1 "DEBUG: User ",string[newUser]," connected with handle ",string hand;
+    
+    // get all other connected handles 
+    otherHandles: exec handle from openConns where handle<>hand;
+    -1 "DEBUG: Other handles to notify: ",-3!otherHandles;
+    
+    // notify all other users
+    if[count otherHandles;
+        msg:"User ",string[newUser]," has joined the chat";
+        -1 "DEBUG: Sending message: ",msg;
+        {[h;m] neg[h]({-1 x};m)}[;msg] each otherHandles;
+    ];
+    }
 
 // GetUsers: query openConns from logging.q
 GetUsers:{[]
@@ -8,28 +32,20 @@ GetUsers:{[]
 
 // SendMsg
 SendMsg:{[to;sender;message]
-    
-    
     handles:$[to=`all;
-        
         exec handle from openConns;
         exec handle from openConns where user=to
     ];
-    show handles;
-     // Send message to target handles - FIXED: Send display command, not function
     if[count handles;
         {neg[x]({-1 x};("[",string[y],"]: ",z))}[;sender;message] each handles;
     ];
-    `sent;
-    
+    `sent
     }
- 
-// Override .z.pg userTo handle chat commands - Fixed parsing
+
+// Override .z.pg to handle chat commands
 .z.pg:{[m]
-    // Handle string commands
+    `queryLog upsert (.z.u; .z.w; .z.h; .z.p; `$(string .z.a); $[10h=type m;m;string m]; 1b);
     if[10h=type m; if[m~"users"; :GetUsers[]]];
-    
-    // Handle list commands (send messages)
     if[0h=type m; 
         if[count m; 
             if[`send~first m; 
@@ -37,9 +53,6 @@ SendMsg:{[to;sender;message]
             ]
         ]
     ];
-    
-    // Default: execute as normal query
-    `queryLog upsert (.z.u; .z.w; .z.h; .z.p; `$(string .z.a); $[10h=type m;m;string m]; 1b);
     value m
     }
 
