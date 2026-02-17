@@ -1,0 +1,71 @@
+5. How could you find a slow subscriber to a process? Is there protection needed against this, or 
+is it safe for the server process?
+
+A slow subscriber is a client that cannot process incoming messages as fast as the 
+server sends them, messages queue up in the server's output. This can cause the server to crash
+or just general system slow down
+
+In order to find slow subscribers you could call .z.W, this will show a dictionary of
+each handle and its output queue size. You could check the handle of the large subscriber
+to identify which process it is.
+
+There is protection needed against this, it is not safe for the server process for a number
+of reasons. Queued messages consume server RAM and can cause memory exhaustation, in turn leading
+to the server running out of memory and killing the process. Additionally, if there are 
+synchronous requests, these may wait forever if there are slow processes. One slow client affects
+all clients.
+
+Protection against this could come in the form of using async messages if possible or setting
+timeouts for sync calls to stop the process if it is taking too long.
+
+6. What happens if you open a connection from a client to kdb server while the server is busy? Is 
+there anything you can do about this
+
+Given kdb+ is single threaded if the server is busy, new connections must wait until the server
+finishes its current task, the hopen will be blocked/hangning waiting to be let in.
+The connection might timeout if it is in limbo for too long.
+
+There are ways round this, for the client side setting timeouts ie server busy try again later function
+that times out after 5 seconds. Also on the server side you could use deferred response to get around this.
+Also as mentioned before given kdb+ is single threaded you could use secondary threads to get around this.
+
+7. I want to set up a gateway process that can send an incoming query onto multiple HDBs, and 
+then serve other queries while it waits for all the HDBs to respond. What is this behavior known as? 
+What function in the .z namespace needs overwritten for this to happen
+
+This behavior is known as Deferred Response. To implement it, you must override the 
+.z.pg function (synchronous message handler) in the .z namespace. The key mechanism is using -30!(::) inside 
+.z.pg which tells KDB+ "don't send a response now - I'll send it later", allowing the gateway to return immediately 
+and handle other incoming queries instead of blocking. When the gateway receives a query from a client, it stores the client handle, 
+fans out the query to multiple HDBs asynchronously using neg[h], and returns -30!(::) to defer the response. As HDB responses come back (handled in .z.ps), 
+the gateway collects them, and once all HDBs have responded, it sends the combined result back to the original client using -30!(clientHandle; result). 
+This pattern enables a single-threaded gateway to efficiently serve many clients concurrently without blocking on slow backend queries.
+
+8. I have connected to a server process and can run most commands fine, e.g. h”1+1”
+What could be the reason I get below error when I run the following?
+q) h: hopen `:host:port:username:password
+q) h “system \”ls ../ \””
+ ‘access
+
+ Initially, I thought this access error would be due to having incorrect credentials for login but if you are already
+ connected to the server this must not be the case. The reason I believe is that the server may have been started
+ with user based restrictions which blocks system commands for remote clients for security reasons. This is because there is a -u flag
+ which means that normal q expressions like h"1+1" work fine over IPC, the -u flag specifically prevents remote clients from executing system 
+ calls such as system "ls", system "rm", or any other shell commands. This is a security measure because allowing remote users to execute system commands could be dangerous 
+
+ 9. I have opened a handle to another process and try to look at a variable defined on that 
+process, variableX. What could cause the below error?
+q) h: hopen `:host:port:username:password
+q) h “variableX”
+ ‘limit
+
+ The 'limit error occurs because variableX is too large to transfer over IPC - the data exceeds the workspace memory limit set by the -w flag on the server,
+  or exceeds the maximum serialization size for IPC transfer.
+
+10. What are the differences, pros and cons of sync, async and deferred sync messaging?
+
+Synchronous messaging is the approach where the client sends a query and blocks waiting for the response, 
+and the server also blocks while processing - this is easy to use with direct return values and simple error handling, but both client and server are frozen until completion, making it unsuitable for high-throughput systems.
+Asynchronous messaging  allows the client to send a query and continue immediately without waiting for a response, and the server processes without blocking - this enables high throughput and fire-and-forget patterns, but there's no direct return value, responses must be handled via callbacks, and error handling is more complex. 
+Deferred synchronous messaging combines the best of both: the client uses normal sync syntax and blocks waiting for a response, but the server uses -30!(::) to defer the response and continue handling other queries, then later sends the result with -30!(clientHandle; result) - this is ideal for gateway processes that fan out queries to multiple backends,
+as the client code stays simple while the server remains non-blocking, though it requires more complex server-side state management to track pending requests and client handles.

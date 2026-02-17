@@ -5,7 +5,7 @@
 // Save original .z.po from logging.q
 .orig.zpo:.z.po
 
-// override .z.po to notify all users when someone joins
+// override .z.po to notify all users when someone joinskophugiug8oygy8
 .z.po:{[hand]
     // call original handler (logging)
     .orig.zpo[hand];
